@@ -56,19 +56,14 @@ MODE          = os.environ.get("MODE", "live")
 PREFERRED_BOOK = os.environ.get("PREFERRED_BOOK")
 PREFERRED_BOOK = int(PREFERRED_BOOK) if PREFERRED_BOOK else None
 
-# Per-league hydration window (hours from now) — how far ahead to pull percents
-# and keep games in the slate. Sport cadence dictates this: MLB is same-day,
-# NFL/CFB markets move for days. Override any of these via env, e.g.
-#   WINDOW_NFL=72  WINDOW_MLB=14
-DEFAULT_WINDOWS = {"MLB": 14, "NBA": 24, "WNBA": 24, "NCAAMB": 30, "NCAAWB": 30,
-                   "NFL": 72, "NCAAFB": 96}
-DEFAULT_WINDOW_FALLBACK = 24
+# Hydration window (hours from now) — how far ahead to keep games and pull
+# percents. One global knob: set WINDOW_HOURS in Railway (default 24).
+# Optional per-league override if you ever want it: WINDOW_NFL=72, etc.
+GLOBAL_WINDOW_HOURS = int(os.environ.get("WINDOW_HOURS", "24"))
 
 def window_hours(league: str) -> int:
     env = os.environ.get(f"WINDOW_{league}")
-    if env:
-        return int(env)
-    return DEFAULT_WINDOWS.get(league, DEFAULT_WINDOW_FALLBACK)
+    return int(env) if env else GLOBAL_WINDOW_HOURS
 
 # Statuses that are over — never re-hydrate, never keep.
 CLOSED_STATUSES = {"closed", "final", "complete", "completed"}
@@ -248,7 +243,10 @@ def collect_games(api_key):
 def fetch_slate_events(sport, league, api_key):
     today = datetime.now(ET).date()
     start = today.isoformat()
-    end = (today + timedelta(days=5)).isoformat()  # wide enough for NFL/CFB windows
+    # Fetch range follows the window (+1 day buffer) so a large WINDOW_HOURS
+    # still pulls those games. Minimum 2 days so same-day always works.
+    span_days = max(2, window_hours(league) // 24 + 1)
+    end = (today + timedelta(days=span_days)).isoformat()
     payload = fetch(f"{BASE_URL}/{sport}/{league}/events?startDate={start}&endDate={end}", api_key)
     if not payload:
         return []
