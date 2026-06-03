@@ -1,0 +1,3 @@
+# The feeder is otherwise pure stdlib. tzdata ensures ZoneInfo("America/New_York")
+# resolves on minimal cloud images (Railway/Render), so ticker times stay ET.
+tzdata

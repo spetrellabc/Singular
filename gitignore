@@ -1,0 +1,5 @@
+.env
+.env.local
+dumps/
+__pycache__/
+*.pyc
